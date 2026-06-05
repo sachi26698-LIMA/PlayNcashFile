@@ -7,8 +7,8 @@ import { router } from 'expo-router';
 import Colors from '@/constants/colors';
 
 type Side = 'heads' | 'tails';
-
-const BET_OPTIONS = [0.10, 0.25, 0.50, 1.00];
+const BETS = [0.10, 0.25, 0.50, 1.00];
+const COIN_SIZE = 160;
 
 export default function CoinFlipGame() {
   const insets = useSafeAreaInsets();
@@ -17,223 +17,190 @@ export default function CoinFlipGame() {
   const [pick, setPick] = useState<Side>('heads');
   const [flipping, setFlipping] = useState(false);
   const [result, setResult] = useState<'win' | 'loss' | null>(null);
-  const [landedSide, setLandedSide] = useState<Side | null>(null);
+  const [landedSide, setLandedSide] = useState<Side>('heads');
   const [streak, setStreak] = useState(0);
   const [totalWon, setTotalWon] = useState(0);
+  const [spins, setSpins] = useState(0);
 
-  // 3D flip animation
   const rotateY = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
+  const floatY = useRef(new Animated.Value(0)).current;
   const resultScale = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0)).current;
+  const bgGlow = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Idle float
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(translateY, { toValue: -8, duration: 1500, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 1500, useNativeDriver: true }),
-      ])
-    ).start();
+    Animated.loop(Animated.sequence([
+      Animated.timing(floatY, { toValue: -10, duration: 1400, useNativeDriver: true }),
+      Animated.timing(floatY, { toValue: 0, duration: 1400, useNativeDriver: true }),
+    ])).start();
   }, []);
 
-  const flipCoin = () => {
+  const flip = () => {
     if (flipping || balance < bet) return;
-    setResult(null);
-    setLandedSide(null);
+    setBalance(p => Math.round((p - bet) * 100) / 100);
     setFlipping(true);
+    setResult(null);
     resultScale.setValue(0);
-    glowAnim.setValue(0);
+    bgGlow.setValue(0);
 
     const outcome: Side = Math.random() < 0.5 ? 'heads' : 'tails';
     const won = outcome === pick;
+    const finalAngle = 6 * 360 + (outcome === 'tails' ? 180 : 0);
 
-    // 3D spin: multiple full 360 rotations + land on correct face
-    // heads = 0°, tails = 180°
-    const extraFlips = 4;
-    const finalAngle = extraFlips * 360 + (outcome === 'tails' ? 180 : 0);
-
-    Animated.timing(rotateY, {
-      toValue: finalAngle,
-      duration: 1800,
-      useNativeDriver: true,
-    }).start(() => {
-      setFlipping(false);
+    Animated.timing(rotateY, { toValue: finalAngle, duration: 2000, useNativeDriver: true }).start(() => {
       setLandedSide(outcome);
       setResult(won ? 'win' : 'loss');
-
+      setSpins(s => s + 1);
       if (won) {
-        const winAmount = bet * 1.9;
-        setBalance(prev => Math.round((prev + winAmount) * 100) / 100);
+        const winAmt = Math.round(bet * 1.9 * 100) / 100;
+        setBalance(p => Math.round((p + winAmt) * 100) / 100);
         setStreak(s => s + 1);
-        setTotalWon(prev => Math.round((prev + winAmount) * 100) / 100);
+        setTotalWon(p => Math.round((p + winAmt) * 100) / 100);
       } else {
-        setBalance(prev => Math.round((prev - bet) * 100) / 100);
         setStreak(0);
       }
-
-      Animated.spring(resultScale, { toValue: 1, friction: 5, tension: 80, useNativeDriver: true }).start();
-      Animated.timing(glowAnim, { toValue: 1, duration: 600, useNativeDriver: false }).start();
+      setFlipping(false);
+      Animated.spring(resultScale, { toValue: 1, friction: 5, useNativeDriver: true }).start();
+      Animated.timing(bgGlow, { toValue: 1, duration: 600, useNativeDriver: false }).start();
     });
   };
 
-  // Calculate 3D perspective transform
-  const spin = rotateY.interpolate({
-    inputRange: [0, 360],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const headsOpacity = rotateY.interpolate({
-    inputRange: [0, 89, 90, 269, 270, 360],
-    outputRange: [1, 1, 0, 0, 1, 1],
-  });
-
-  const tailsOpacity = rotateY.interpolate({
-    inputRange: [0, 89, 90, 269, 270, 360],
-    outputRange: [0, 0, 1, 1, 0, 0],
-  });
-
+  const spin = rotateY.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] });
+  const headsOp = rotateY.interpolate({ inputRange: [0, 89, 90, 269, 270, 360], outputRange: [1, 1, 0, 0, 1, 1] });
+  const tailsOp = rotateY.interpolate({ inputRange: [0, 89, 90, 269, 270, 360], outputRange: [0, 0, 1, 1, 0, 0] });
   const won = result === 'win';
-  const glowColor = glowAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['rgba(0,0,0,0)', won ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)'],
-  });
+
+  const glowStyle = Platform.OS === 'web' ? {
+    boxShadow: result ? `0 0 60px ${won ? Colors.neonGreen : Colors.neonRed}44, 0 0 120px ${won ? Colors.neonGreen : Colors.neonRed}22` : undefined,
+  } as any : {};
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, glowStyle]}>
       {/* Header */}
-      <LinearGradient colors={[Colors.background, Colors.surface]} style={[styles.header, { paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8 }]}>
+      <LinearGradient colors={[Colors.bgAlt, Colors.bg]} style={[styles.header, { paddingTop: Platform.OS === 'web' ? 56 : insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={Colors.text} />
         </TouchableOpacity>
-        <View style={styles.titleWrap}>
-          <Text style={styles.title}>Coin Flip</Text>
-          <Text style={styles.subtitle}>50% Win Chance · 1.9x Payout</Text>
+        <View>
+          <Text style={styles.title}>Coin Rush</Text>
+          <Text style={styles.subtitle}>50% Chance · 1.9x Payout</Text>
         </View>
-        <LinearGradient colors={Colors.gradientGold} style={styles.balancePill}>
-          <Text style={styles.balanceText}>${balance.toFixed(2)}</Text>
+        <LinearGradient colors={Colors.gradGold} style={styles.balancePill}>
+          <Ionicons name="wallet" size={12} color={Colors.bg} />
+          <Text style={styles.balanceTxt}>${balance.toFixed(2)}</Text>
         </LinearGradient>
       </LinearGradient>
 
-      {/* Streak banner */}
       {streak >= 2 && (
         <LinearGradient colors={['#F97316', '#EF4444']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.streakBanner}>
-          <Text style={styles.streakText}>🔥 {streak} Win Streak! Keep going!</Text>
+          <Text style={styles.streakTxt}>🔥 {streak} Win Streak! Keep going!</Text>
         </LinearGradient>
       )}
 
       {/* Coin Arena */}
-      <Animated.View style={[styles.coinArena, { backgroundColor: glowColor }]}>
-        {/* 3D Coin */}
-        <Animated.View style={[styles.coinContainer, { transform: [{ translateY }, { perspective: 800 } as any, { rotateY: spin }] }]}>
-          {/* Heads face */}
-          <Animated.View style={[styles.coin, styles.coinFaceHeads, { opacity: headsOpacity }]}>
-            <LinearGradient colors={['#FCD34D', '#F59E0B', '#D97706']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.coinFace}>
+      <View style={styles.arena}>
+        {/* Background glow orbs */}
+        <View style={[styles.arenaOrb, { backgroundColor: Colors.neonGold, top: 20, left: -60 }]} />
+        <View style={[styles.arenaOrb, { backgroundColor: Colors.neonPurple, bottom: 20, right: -60 }]} />
+
+        <Animated.View style={{ transform: [{ translateY: floatY }, { perspective: 1000 } as any, { rotateY: spin }] }}>
+          {/* HEADS */}
+          <Animated.View style={[styles.coin, { opacity: headsOp, position: 'absolute' }]}>
+            <LinearGradient colors={['#FCD34D', '#F59E0B', '#D97706', '#B45309']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.coinFace}>
               <View style={styles.coinRim} />
               <Text style={styles.coinEmoji}>👑</Text>
-              <Text style={styles.coinFaceLabel}>HEADS</Text>
+              <Text style={styles.coinLabel}>HEADS</Text>
+              {/* Inner ring detail */}
+              <View style={styles.coinInnerRing} />
             </LinearGradient>
           </Animated.View>
-          {/* Tails face */}
-          <Animated.View style={[styles.coin, styles.coinFaceTails, { opacity: tailsOpacity }]}>
-            <LinearGradient colors={['#A78BFA', '#7C3AED', '#5B21B6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.coinFace}>
+          {/* TAILS */}
+          <Animated.View style={[styles.coin, { opacity: tailsOp }]}>
+            <LinearGradient colors={['#A78BFA', '#8B5CF6', '#6D28D9', '#4C1D95']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.coinFace}>
               <View style={styles.coinRim} />
               <Text style={styles.coinEmoji}>🦅</Text>
-              <Text style={styles.coinFaceLabel}>TAILS</Text>
+              <Text style={styles.coinLabel}>TAILS</Text>
+              <View style={styles.coinInnerRing} />
             </LinearGradient>
           </Animated.View>
         </Animated.View>
 
         {/* Shadow */}
-        <View style={styles.coinShadow} />
+        <LinearGradient colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0)']} style={styles.coinShadow} />
 
-        {/* Result popup */}
+        {/* Result */}
         {result && (
           <Animated.View style={[styles.resultPop, { transform: [{ scale: resultScale }] }]}>
             <LinearGradient
-              colors={won ? [Colors.success, Colors.successLight] : [Colors.error, '#F87171']}
+              colors={won ? [Colors.neonGreen, '#059669'] : [Colors.neonRed, '#B91C1C']}
               style={styles.resultPopInner}
             >
-              <Text style={styles.resultPopEmoji}>{won ? '🎉' : '😞'}</Text>
-              <Text style={styles.resultPopTitle}>{won ? 'YOU WON!' : 'YOU LOST'}</Text>
-              <Text style={styles.resultPopAmount}>{won ? `+$${(bet * 1.9).toFixed(2)}` : `-$${bet.toFixed(2)}`}</Text>
+              <Text style={styles.resultEmoji}>{won ? '🎉' : '💸'}</Text>
+              <Text style={styles.resultTitle}>{won ? 'YOU WON!' : 'YOU LOST'}</Text>
+              <Text style={styles.resultAmount}>{won ? `+$${(bet * 1.9).toFixed(2)}` : `-$${bet.toFixed(2)}`}</Text>
             </LinearGradient>
           </Animated.View>
         )}
-      </Animated.View>
+      </View>
 
-      {/* Pick Side */}
+      {/* Pick side */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>PICK YOUR SIDE</Text>
+        <Text style={styles.sectionLbl}>PICK YOUR SIDE</Text>
         <View style={styles.pickRow}>
-          {(['heads', 'tails'] as Side[]).map(side => (
-            <TouchableOpacity key={side} onPress={() => !flipping && setPick(side)} style={{ flex: 1 }} activeOpacity={0.85}>
-              {pick === side ? (
-                <LinearGradient
-                  colors={side === 'heads' ? ['#FCD34D', '#F59E0B'] : ['#A78BFA', '#7C3AED']}
-                  style={styles.pickBtnActive}
-                >
-                  <Text style={styles.pickEmoji}>{side === 'heads' ? '👑' : '🦅'}</Text>
-                  <Text style={styles.pickLabelActive}>{side === 'heads' ? 'Heads' : 'Tails'}</Text>
-                </LinearGradient>
-              ) : (
-                <View style={styles.pickBtn}>
-                  <Text style={styles.pickEmoji}>{side === 'heads' ? '👑' : '🦅'}</Text>
-                  <Text style={styles.pickLabel}>{side === 'heads' ? 'Heads' : 'Tails'}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
+          {(['heads', 'tails'] as Side[]).map(side => {
+            const active = pick === side;
+            const grad = side === 'heads' ? ['#FCD34D', '#F59E0B'] as const : ['#A78BFA', '#8B5CF6'] as const;
+            const gs = active && Platform.OS === 'web' ? { boxShadow: `0 4px 20px ${side === 'heads' ? Colors.neonGold : Colors.neonPurple}55` } as any : {};
+            return (
+              <TouchableOpacity key={side} style={{ flex: 1 }} onPress={() => !flipping && setPick(side)}>
+                {active
+                  ? <LinearGradient colors={grad} style={[styles.pickActive, gs]}><Text style={styles.pickEmoji}>{side === 'heads' ? '👑' : '🦅'}</Text><Text style={styles.pickActiveTxt}>{side === 'heads' ? 'Heads' : 'Tails'}</Text></LinearGradient>
+                  : <View style={styles.pickInactive}><Text style={styles.pickEmoji}>{side === 'heads' ? '👑' : '🦅'}</Text><Text style={styles.pickTxt}>{side === 'heads' ? 'Heads' : 'Tails'}</Text></View>
+                }
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
       {/* Bet */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>BET AMOUNT</Text>
+        <Text style={styles.sectionLbl}>BET AMOUNT</Text>
         <View style={styles.betRow}>
-          {BET_OPTIONS.map(amt => (
-            <TouchableOpacity key={amt} onPress={() => !flipping && setBet(amt)} style={{ flex: 1 }}>
-              {bet === amt ? (
-                <LinearGradient colors={Colors.gradientPrimary} style={styles.betActive}>
-                  <Text style={styles.betActiveText}>${amt.toFixed(2)}</Text>
-                </LinearGradient>
-              ) : (
-                <View style={styles.betBtn}>
-                  <Text style={styles.betText}>${amt.toFixed(2)}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
+          {BETS.map(amt => {
+            const gs = bet === amt && Platform.OS === 'web' ? { boxShadow: `0 4px 20px ${Colors.neonPurple}44` } as any : {};
+            return (
+              <TouchableOpacity key={amt} style={{ flex: 1 }} onPress={() => !flipping && setBet(amt)}>
+                {bet === amt
+                  ? <LinearGradient colors={Colors.gradPurple} style={[styles.betActive, gs]}><Text style={styles.betActiveTxt}>${amt.toFixed(2)}</Text></LinearGradient>
+                  : <View style={styles.betInactive}><Text style={styles.betTxt}>${amt.toFixed(2)}</Text></View>}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </View>
 
       {/* Flip button */}
-      <TouchableOpacity
-        style={{ marginHorizontal: 20, marginBottom: 16, borderRadius: 20, overflow: 'hidden' }}
-        onPress={flipCoin}
-        disabled={flipping || balance < bet}
-        activeOpacity={0.9}
-      >
+      <TouchableOpacity onPress={flip} disabled={flipping || balance < bet} activeOpacity={0.9} style={styles.flipWrap}>
         <LinearGradient
-          colors={(flipping || balance < bet) ? [Colors.surfaceAlt, Colors.surfaceAlt] : ['#7C3AED', '#EC4899']}
+          colors={(flipping || balance < bet) ? [Colors.surfaceAlt, Colors.surfaceAlt] : ['#8B5CF6', '#EC4899']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={styles.flipBtn}
         >
           <Ionicons name={flipping ? 'ellipsis-horizontal' : 'sync'} size={20} color={Colors.white} />
-          <Text style={styles.flipBtnText}>{flipping ? 'Flipping...' : `Flip for $${bet.toFixed(2)}`}</Text>
+          <Text style={styles.flipTxt}>{flipping ? 'Flipping...' : `Flip for $${bet.toFixed(2)}`}</Text>
         </LinearGradient>
       </TouchableOpacity>
 
       {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Won', value: `$${totalWon.toFixed(2)}`, color: Colors.success },
-          { label: 'Streak', value: `${streak} 🔥`, color: Colors.warning },
-          { label: 'Chance', value: '50%', color: Colors.primaryLight },
+          { label: 'Won', value: `$${totalWon.toFixed(2)}`, color: Colors.neonGreen },
+          { label: 'Streak', value: `${streak} 🔥`, color: Colors.neonGold },
+          { label: 'Flips', value: `${spins}`, color: Colors.neonPurple },
         ].map((s, i) => (
-          <View key={s.label} style={[styles.statCard, i < 2 && styles.statCardBorder]}>
-            <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-            <Text style={styles.statLabel}>{s.label}</Text>
+          <View key={s.label} style={[styles.stat, i > 0 && { borderLeftWidth: 1, borderLeftColor: Colors.border }]}>
+            <Text style={[styles.statV, { color: s.color }]}>{s.value}</Text>
+            <Text style={styles.statL}>{s.label}</Text>
           </View>
         ))}
       </View>
@@ -241,85 +208,51 @@ export default function CoinFlipGame() {
   );
 }
 
-const COIN_SIZE = 160;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center',
-  },
-  titleWrap: { flex: 1 },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 18, fontWeight: '900', color: Colors.text, flex: 1 },
   subtitle: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
-  balancePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  balanceText: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  balancePill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20 },
+  balanceTxt: { fontSize: 13, fontWeight: '900', color: Colors.bg },
   streakBanner: { marginHorizontal: 16, marginTop: 10, borderRadius: 14, padding: 10, alignItems: 'center' },
-  streakText: { fontSize: 14, fontWeight: '800', color: Colors.white },
-  coinArena: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    position: 'relative', borderRadius: 24, margin: 16,
-    borderWidth: 1, borderColor: Colors.border,
-  },
-  coinContainer: { width: COIN_SIZE, height: COIN_SIZE, position: 'relative' },
-  coin: { position: 'absolute', width: COIN_SIZE, height: COIN_SIZE, borderRadius: COIN_SIZE / 2 },
-  coinFaceHeads: {},
-  coinFaceTails: {},
+  streakTxt: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  arena: { flex: 1, alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' },
+  arenaOrb: { position: 'absolute', width: 200, height: 200, borderRadius: 100, opacity: 0.07 },
+  coin: { width: COIN_SIZE, height: COIN_SIZE, borderRadius: COIN_SIZE / 2 },
   coinFace: {
-    flex: 1, borderRadius: COIN_SIZE / 2, alignItems: 'center', justifyContent: 'center',
-    gap: 6, borderWidth: 4, borderColor: 'rgba(255,255,255,0.2)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.5, shadowRadius: 20,
-    elevation: 20,
+    flex: 1, borderRadius: COIN_SIZE / 2, alignItems: 'center', justifyContent: 'center', gap: 8,
+    borderWidth: 4, borderColor: 'rgba(255,255,255,0.25)',
   },
-  coinRim: {
-    position: 'absolute', inset: 8, borderRadius: COIN_SIZE / 2 - 8,
-    borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)',
-  },
+  coinRim: { position: 'absolute', inset: 10, borderRadius: COIN_SIZE / 2 - 10, borderWidth: 2, borderColor: 'rgba(255,255,255,0.15)' },
+  coinInnerRing: { position: 'absolute', inset: 20, borderRadius: COIN_SIZE / 2 - 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   coinEmoji: { fontSize: 52 },
-  coinFaceLabel: { fontSize: 12, fontWeight: '900', color: 'rgba(255,255,255,0.9)', letterSpacing: 2 },
-  coinShadow: {
-    width: COIN_SIZE * 0.7, height: 20, borderRadius: 50,
-    backgroundColor: 'rgba(0,0,0,0.4)', marginTop: 20,
-  },
-  resultPop: { position: 'absolute', bottom: 16 },
-  resultPopInner: {
-    paddingHorizontal: 24, paddingVertical: 14, borderRadius: 20,
-    alignItems: 'center', gap: 2,
-  },
-  resultPopEmoji: { fontSize: 24 },
-  resultPopTitle: { fontSize: 14, fontWeight: '900', color: Colors.white, letterSpacing: 1 },
-  resultPopAmount: { fontSize: 22, fontWeight: '900', color: Colors.white },
+  coinLabel: { fontSize: 11, fontWeight: '900', color: 'rgba(255,255,255,0.9)', letterSpacing: 2 },
+  coinShadow: { width: COIN_SIZE * 0.7, height: 20, borderRadius: 50, marginTop: 16 },
+  resultPop: { position: 'absolute', bottom: 20 },
+  resultPopInner: { paddingHorizontal: 28, paddingVertical: 16, borderRadius: 22, alignItems: 'center', gap: 2 },
+  resultEmoji: { fontSize: 28 },
+  resultTitle: { fontSize: 14, fontWeight: '900', color: Colors.white, letterSpacing: 1.5 },
+  resultAmount: { fontSize: 26, fontWeight: '900', color: Colors.white },
   section: { paddingHorizontal: 16, marginBottom: 14 },
-  sectionLabel: { fontSize: 10, fontWeight: '700', color: Colors.textMuted, letterSpacing: 1.5, marginBottom: 10 },
+  sectionLbl: { fontSize: 10, fontWeight: '700', color: Colors.textMuted, letterSpacing: 2, marginBottom: 10 },
   pickRow: { flexDirection: 'row', gap: 10 },
-  pickBtn: {
-    borderWidth: 1, borderColor: Colors.border, borderRadius: 18,
-    paddingVertical: 14, alignItems: 'center', gap: 6, backgroundColor: Colors.surface,
-  },
-  pickBtnActive: { borderRadius: 18, paddingVertical: 14, alignItems: 'center', gap: 6 },
+  pickActive: { borderRadius: 18, paddingVertical: 14, alignItems: 'center', gap: 6 },
+  pickActiveTxt: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  pickInactive: { borderWidth: 1, borderColor: Colors.border, borderRadius: 18, paddingVertical: 14, alignItems: 'center', gap: 6, backgroundColor: Colors.surface },
+  pickTxt: { fontSize: 14, fontWeight: '700', color: Colors.textMuted },
   pickEmoji: { fontSize: 26 },
-  pickLabel: { fontSize: 14, fontWeight: '700', color: Colors.textSecondary },
-  pickLabelActive: { fontSize: 14, fontWeight: '800', color: Colors.white },
   betRow: { flexDirection: 'row', gap: 8 },
-  betBtn: {
-    borderWidth: 1, borderColor: Colors.border, borderRadius: 14,
-    paddingVertical: 10, alignItems: 'center', backgroundColor: Colors.surface,
-  },
-  betActive: { borderRadius: 14, paddingVertical: 10, alignItems: 'center' },
-  betText: { fontSize: 13, fontWeight: '700', color: Colors.textSecondary },
-  betActiveText: { fontSize: 13, fontWeight: '800', color: Colors.white },
+  betActive: { borderRadius: 14, paddingVertical: 11, alignItems: 'center' },
+  betActiveTxt: { fontSize: 13, fontWeight: '800', color: Colors.white },
+  betInactive: { borderWidth: 1, borderColor: Colors.border, borderRadius: 14, paddingVertical: 11, alignItems: 'center', backgroundColor: Colors.surface },
+  betTxt: { fontSize: 13, fontWeight: '700', color: Colors.textMuted },
+  flipWrap: { marginHorizontal: 16, marginBottom: 14, borderRadius: 22, overflow: 'hidden' },
   flipBtn: { paddingVertical: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  flipBtnText: { fontSize: 17, fontWeight: '800', color: Colors.white },
-  statsRow: {
-    flexDirection: 'row', marginHorizontal: 16, marginBottom: 16,
-    backgroundColor: Colors.surface, borderRadius: 18, borderWidth: 1, borderColor: Colors.border,
-  },
-  statCard: { flex: 1, alignItems: 'center', paddingVertical: 14 },
-  statCardBorder: { borderRightWidth: 1, borderRightColor: Colors.border },
-  statValue: { fontSize: 18, fontWeight: '800' },
-  statLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
+  flipTxt: { fontSize: 18, fontWeight: '900', color: Colors.white },
+  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 16, backgroundColor: Colors.surface, borderRadius: 18, borderWidth: 1, borderColor: Colors.border },
+  stat: { flex: 1, alignItems: 'center', paddingVertical: 14 },
+  statV: { fontSize: 18, fontWeight: '800' },
+  statL: { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
 });

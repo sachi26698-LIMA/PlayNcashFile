@@ -1,36 +1,29 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Text, TextStyle } from 'react-native';
+import { Animated, TextStyle } from 'react-native';
 
 interface AnimatedNumberProps {
   value: number;
   prefix?: string;
+  suffix?: string;
   decimals?: number;
   style?: TextStyle;
   duration?: number;
 }
 
-export default function AnimatedNumber({
-  value,
-  prefix = '',
-  decimals = 2,
-  style,
-  duration = 800,
-}: AnimatedNumberProps) {
-  const anim = useRef(new Animated.Value(value)).current;
-  const displayRef = useRef(value);
+export default function AnimatedNumber({ value, prefix = '', suffix = '', decimals = 2, style, duration = 900 }: AnimatedNumberProps) {
+  const anim = useRef(new Animated.Value(0)).current;
+  const prev = useRef(0);
 
   useEffect(() => {
-    Animated.timing(anim, {
-      toValue: value,
-      duration,
-      useNativeDriver: false,
-    }).start();
+    anim.setValue(prev.current);
+    Animated.timing(anim, { toValue: value, duration, useNativeDriver: false }).start();
+    prev.current = value;
   }, [value]);
 
-  const animatedText = anim.interpolate({
-    inputRange: [0, value || 1],
-    outputRange: [`${prefix}0.${'0'.repeat(decimals)}`, `${prefix}${value.toFixed(decimals)}`],
+  const text = anim.interpolate({
+    inputRange: [0, Math.max(value, 0.01)],
+    outputRange: [`${prefix}0.${'0'.repeat(decimals)}${suffix}`, `${prefix}${value.toFixed(decimals)}${suffix}`],
   });
 
-  return <Animated.Text style={style}>{animatedText}</Animated.Text>;
+  return <Animated.Text style={style}>{text}</Animated.Text>;
 }

@@ -1,0 +1,1 @@
+- [PlayNCash design system](playncash-design.md) — cyber-gaming theme: Colors.bg=#05050D, neon palette, web glow via boxShadow cast as `any`

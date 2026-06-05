@@ -23,22 +23,17 @@ const SEG_DEG = 360 / SEG_COUNT;
 const WHEEL_SIZE = 270;
 const R = WHEEL_SIZE / 2;
 
-function pickSegment(): number {
+function pick(): number {
   let r = Math.random(), c = 0;
-  for (let i = 0; i < SEGMENTS.length; i++) {
-    c += SEGMENTS[i].probability;
-    if (r <= c) return i;
-  }
+  for (let i = 0; i < SEGMENTS.length; i++) { c += SEGMENTS[i].probability; if (r <= c) return i; }
   return 0;
 }
 
-function WheelView({ rotation }: { rotation: Animated.Value }) {
+function WheelSVG({ rotation }: { rotation: Animated.Value }) {
   const spin = rotation.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   return (
     <Animated.View style={{ width: WHEEL_SIZE, height: WHEEL_SIZE, transform: [{ rotate: spin }] }}>
-      {/* Outer glow ring */}
-      <View style={styles.wheelGlowRing} />
-      <View style={{ width: WHEEL_SIZE, height: WHEEL_SIZE, borderRadius: R, overflow: 'hidden', position: 'relative' }}>
+      <View style={{ width: WHEEL_SIZE, height: WHEEL_SIZE, borderRadius: R, overflow: 'hidden', backgroundColor: Colors.bg, position: 'relative' }}>
         {SEGMENTS.map((seg, i) => {
           const midAngle = (i + 0.5) * SEG_DEG;
           const midRad = ((midAngle - 90) * Math.PI) / 180;
@@ -47,27 +42,25 @@ function WheelView({ rotation }: { rotation: Animated.Value }) {
           const ty = R + textR * Math.sin(midRad) - 10;
           return (
             <View key={i} style={StyleSheet.absoluteFillObject}>
-              {/* Segment slice using clip */}
               <View style={[StyleSheet.absoluteFillObject, { transform: [{ rotate: `${i * SEG_DEG}deg` }], overflow: 'hidden' }]}>
-                <View style={[styles.sliceLeft, { backgroundColor: seg.colors[0] }]} />
+                <View style={{ position: 'absolute', left: R, top: 0, width: R, height: WHEEL_SIZE, backgroundColor: seg.colors[0], transformOrigin: `0 ${R}px`, transform: [{ rotate: `${SEG_DEG}deg` }] } as any} />
+                <View style={{ position: 'absolute', left: R, top: 0, width: R, height: WHEEL_SIZE, backgroundColor: seg.colors[0] }} />
               </View>
-              <View style={[StyleSheet.absoluteFillObject, { transform: [{ rotate: `${i * SEG_DEG + SEG_DEG}deg` }], overflow: 'hidden' }]}>
-                <View style={[styles.sliceRight, { backgroundColor: seg.colors[0] }]} />
-              </View>
-              {/* Label */}
-              <View style={[styles.segLabelWrap, { left: tx, top: ty, transform: [{ rotate: `${midAngle}deg` }] }]}>
-                <Text style={styles.segLabel}>{seg.label}</Text>
+              <View style={[styles.segLabel, { left: tx, top: ty, transform: [{ rotate: `${midAngle}deg` }] }]}>
+                <Text style={styles.segLabelTxt}>{seg.label}</Text>
               </View>
             </View>
           );
         })}
-        {/* Divider lines */}
+        {/* Dividers */}
         {SEGMENTS.map((_, i) => (
           <View key={`d${i}`} style={[styles.divider, { transform: [{ rotate: `${i * SEG_DEG}deg` }] } as any]} />
         ))}
+        {/* Glow ring */}
+        <View style={styles.wheelGlowRing} />
         {/* Center */}
-        <View style={styles.wheelCenter}>
-          <LinearGradient colors={Colors.gradientPrimary} style={styles.wheelCenterGrad}>
+        <View style={styles.center}>
+          <LinearGradient colors={Colors.gradPurple} style={styles.centerGrad}>
             <Ionicons name="star" size={18} color={Colors.white} />
           </LinearGradient>
         </View>
@@ -96,17 +89,11 @@ export default function LuckySpinGame() {
     setLastResult(null);
     resultScale.setValue(0);
 
-    const idx = pickSegment();
+    const idx = pick();
     const landAt = 360 - idx * SEG_DEG - SEG_DEG / 2;
-    const fullSpins = 7 + Math.floor(Math.random() * 3);
-    totalRot.current += fullSpins * 360 + landAt;
+    totalRot.current += (8 + Math.floor(Math.random() * 3)) * 360 + landAt;
 
-    Animated.timing(rotAnim, {
-      toValue: totalRot.current / 360,
-      duration: 4800,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start(() => {
+    Animated.timing(rotAnim, { toValue: totalRot.current / 360, duration: 5000, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start(() => {
       const seg = SEGMENTS[idx];
       setLastResult(seg);
       setSpins(s => s + 1);
@@ -120,95 +107,89 @@ export default function LuckySpinGame() {
     });
   };
 
+  const won = lastResult && lastResult.value > 0;
+  const gs = Platform.OS === 'web' ? { boxShadow: `0 0 60px ${Colors.neonPurple}44, 0 0 120px ${Colors.neonPurple}22` } as any : {};
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <LinearGradient colors={[Colors.background, Colors.surface]} style={[styles.header, { paddingTop: Platform.OS === 'web' ? 67 : insets.top + 8 }]}>
+      <LinearGradient colors={[Colors.bgAlt, Colors.bg]} style={[styles.header, { paddingTop: Platform.OS === 'web' ? 56 : insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={22} color={Colors.text} />
         </TouchableOpacity>
-        <View style={styles.titleWrap}>
+        <View>
           <Text style={styles.title}>Lucky Spin</Text>
           <Text style={styles.subtitle}>Win up to $10.00 per spin</Text>
         </View>
-        <LinearGradient colors={Colors.gradientPrimary} style={styles.balancePill}>
-          <Text style={styles.balanceText}>${balance.toFixed(2)}</Text>
+        <LinearGradient colors={Colors.gradPurple} style={styles.balancePill}>
+          <Text style={styles.balanceTxt}>${balance.toFixed(2)}</Text>
         </LinearGradient>
       </LinearGradient>
 
-      {/* Result */}
+      {/* Result banner */}
       {lastResult && (
-        <Animated.View style={{ transform: [{ scale: resultScale }], marginHorizontal: 16, marginTop: 10 }}>
+        <Animated.View style={[{ transform: [{ scale: resultScale }], marginHorizontal: 16, marginTop: 10 }]}>
           <LinearGradient
-            colors={lastResult.value > 0 ? [Colors.success, Colors.successLight] : [Colors.error, '#F87171']}
+            colors={won ? [Colors.neonGreen, '#059669'] : [Colors.neonRed, '#B91C1C']}
             start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
             style={styles.resultBanner}
           >
-            <Text style={styles.resultText}>
-              {lastResult.value > 0 ? `🎉 You won ${lastResult.label}!` : '😞 No luck — try again!'}
-            </Text>
+            <Text style={styles.resultTxt}>{won ? `🎉 You won ${lastResult.label}!` : '😞 No luck — try again!'}</Text>
           </LinearGradient>
         </Animated.View>
       )}
 
-      {/* Prizes legend */}
-      <View style={styles.legendRow}>
+      {/* Legend */}
+      <View style={styles.legend}>
         {SEGMENTS.map((s, i) => (
           <View key={i} style={styles.legendItem}>
             <LinearGradient colors={s.colors} style={styles.legendDot} />
-            <Text style={styles.legendText}>{s.label}</Text>
+            <Text style={styles.legendTxt}>{s.label}</Text>
           </View>
         ))}
       </View>
 
-      {/* Wheel area */}
-      <View style={styles.wheelArea}>
-        {/* Glow background */}
+      {/* Wheel */}
+      <View style={[styles.wheelArea, gs]}>
         <View style={styles.wheelGlow} />
         {/* Pointer */}
         <View style={styles.pointer}>
-          <View style={styles.pointerShadow} />
-          <LinearGradient colors={['#F8FAFC', '#CBD5E1']} style={styles.pointerShape} />
+          <LinearGradient colors={[Colors.white, '#CBD5E1']} style={styles.pointerShape} />
         </View>
-        <WheelView rotation={rotAnim} />
+        <WheelSVG rotation={rotAnim} />
       </View>
 
-      {/* Spin cost */}
-      <Text style={styles.costHint}>Each spin costs <Text style={{ color: Colors.primaryLight, fontWeight: '700' }}>${SPIN_COST.toFixed(2)}</Text></Text>
+      <Text style={styles.costHint}>Each spin costs <Text style={{ color: Colors.neonPurple, fontWeight: '800' }}>${SPIN_COST.toFixed(2)}</Text></Text>
 
-      {/* Spin button */}
-      <TouchableOpacity onPress={spin} disabled={spinning || balance < SPIN_COST} activeOpacity={0.9} style={styles.spinBtnWrap}>
+      <TouchableOpacity onPress={spin} disabled={spinning || balance < SPIN_COST} activeOpacity={0.9} style={styles.spinWrap}>
         <LinearGradient
-          colors={(spinning || balance < SPIN_COST) ? [Colors.surfaceAlt, Colors.surfaceAlt] : ['#7C3AED', '#EC4899']}
+          colors={(spinning || balance < SPIN_COST) ? [Colors.surfaceAlt, Colors.surfaceAlt] : ['#8B5CF6', '#EC4899']}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
           style={styles.spinBtn}
         >
           <Ionicons name="sync" size={22} color={Colors.white} />
-          <Text style={styles.spinBtnText}>{spinning ? 'Spinning...' : '  S P I N  '}</Text>
+          <Text style={styles.spinTxt}>{spinning ? 'Spinning...' : '  S P I N  '}</Text>
         </LinearGradient>
       </TouchableOpacity>
 
-      {/* History */}
       {history.length > 0 && (
         <View style={styles.historyRow}>
           {history.map((h, i) => (
             <LinearGradient key={i} colors={h.colors} style={styles.historyPill}>
-              <Text style={styles.historyText}>{h.label}</Text>
+              <Text style={styles.historyTxt}>{h.label}</Text>
             </LinearGradient>
           ))}
         </View>
       )}
 
-      {/* Stats */}
       <View style={styles.statsRow}>
         {[
-          { label: 'Spins', value: `${spins}`, color: Colors.primaryLight },
-          { label: 'Total Won', value: `$${totalWon.toFixed(2)}`, color: Colors.success },
-          { label: 'Spent', value: `$${(spins * SPIN_COST).toFixed(2)}`, color: Colors.error },
+          { label: 'Spins', value: `${spins}`, color: Colors.neonPurple },
+          { label: 'Total Won', value: `$${totalWon.toFixed(2)}`, color: Colors.neonGreen },
+          { label: 'Spent', value: `$${(spins * SPIN_COST).toFixed(2)}`, color: Colors.neonRed },
         ].map((s, i) => (
-          <View key={s.label} style={[styles.statCard, i < 2 && styles.statCardBorder]}>
-            <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
-            <Text style={styles.statLabel}>{s.label}</Text>
+          <View key={s.label} style={[styles.stat, i > 0 && { borderLeftWidth: 1, borderLeftColor: Colors.border }]}>
+            <Text style={[styles.statV, { color: s.color }]}>{s.value}</Text>
+            <Text style={styles.statL}>{s.label}</Text>
           </View>
         ))}
       </View>
@@ -217,83 +198,38 @@ export default function LuckySpinGame() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border,
-  },
-  backBtn: {
-    width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.surface,
-    borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center',
-  },
-  titleWrap: { flex: 1 },
-  title: { fontSize: 18, fontWeight: '800', color: Colors.text },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: Colors.border },
+  backBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' },
+  title: { fontSize: 18, fontWeight: '900', color: Colors.text, flex: 1 },
   subtitle: { fontSize: 11, color: Colors.textMuted, marginTop: 1 },
   balancePill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20 },
-  balanceText: { fontSize: 14, fontWeight: '800', color: Colors.white },
+  balanceTxt: { fontSize: 13, fontWeight: '900', color: Colors.white },
   resultBanner: { borderRadius: 14, padding: 12, alignItems: 'center' },
-  resultText: { fontSize: 15, fontWeight: '800', color: Colors.white },
-  legendRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8, paddingTop: 10 },
+  resultTxt: { fontSize: 15, fontWeight: '800', color: Colors.white },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8, paddingTop: 10 },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendDot: { width: 12, height: 12, borderRadius: 6 },
-  legendText: { fontSize: 11, fontWeight: '600', color: Colors.textSecondary },
+  legendTxt: { fontSize: 11, fontWeight: '600', color: Colors.textSec },
   wheelArea: { alignItems: 'center', justifyContent: 'center', flex: 1, position: 'relative' },
-  wheelGlow: {
-    position: 'absolute', width: WHEEL_SIZE + 60, height: WHEEL_SIZE + 60, borderRadius: (WHEEL_SIZE + 60) / 2,
-    backgroundColor: 'rgba(124,58,237,0.08)',
-  },
-  wheelGlowRing: {
-    position: 'absolute', inset: -6, borderRadius: R + 6,
-    borderWidth: 4, borderColor: 'rgba(124,58,237,0.3)',
-  },
+  wheelGlow: { position: 'absolute', width: WHEEL_SIZE + 60, height: WHEEL_SIZE + 60, borderRadius: (WHEEL_SIZE + 60) / 2, backgroundColor: Colors.neonPurple, opacity: 0.07 },
+  wheelGlowRing: { position: 'absolute', inset: -6, borderRadius: R + 6, borderWidth: 4, borderColor: Colors.neonPurple + '44' },
   pointer: { position: 'absolute', top: -2, zIndex: 10, alignItems: 'center' },
-  pointerShape: {
-    width: 0, height: 0,
-    borderLeftWidth: 13, borderRightWidth: 13, borderTopWidth: 28,
-    borderLeftColor: 'transparent', borderRightColor: 'transparent',
-    borderTopColor: Colors.white,
-    borderRadius: 2,
-  } as any,
-  pointerShadow: {
-    position: 'absolute', bottom: -4, width: 16, height: 8, borderRadius: 4,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  sliceLeft: {
-    position: 'absolute', left: R, top: 0, width: R, height: R,
-    transformOrigin: '0 100%',
-    transform: [{ rotate: `${SEG_DEG}deg` }],
-  } as any,
-  sliceRight: {
-    position: 'absolute', left: R, top: 0, width: R, height: R,
-  },
-  segLabelWrap: { position: 'absolute', width: 44, alignItems: 'center' },
-  segLabel: { fontSize: 10, fontWeight: '800', color: 'rgba(255,255,255,0.95)', textAlign: 'center' },
-  divider: {
-    position: 'absolute', left: R - 1, top: 0, width: 2, height: R,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    transformOrigin: `1px ${R}px`,
-  } as any,
-  wheelCenter: {
-    position: 'absolute', left: R - 26, top: R - 26,
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: Colors.background,
-    borderWidth: 3, borderColor: Colors.border,
-    alignItems: 'center', justifyContent: 'center', zIndex: 5,
-  },
-  wheelCenterGrad: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  costHint: { textAlign: 'center', color: Colors.textSecondary, fontSize: 13, marginBottom: 8 },
-  spinBtnWrap: { marginHorizontal: 16, marginBottom: 10, borderRadius: 22, overflow: 'hidden' },
+  pointerShape: { width: 0, height: 0, borderLeftWidth: 13, borderRightWidth: 13, borderTopWidth: 26, borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: Colors.white, borderRadius: 2 } as any,
+  segLabel: { position: 'absolute', width: 48, alignItems: 'center' },
+  segLabelTxt: { fontSize: 10, fontWeight: '900', color: 'rgba(255,255,255,0.95)', textAlign: 'center' },
+  divider: { position: 'absolute', left: R - 1, top: 0, width: 2, height: R, backgroundColor: 'rgba(0,0,0,0.3)', transformOrigin: `1px ${R}px` } as any,
+  center: { position: 'absolute', left: R - 26, top: R - 26, width: 52, height: 52, borderRadius: 26, backgroundColor: Colors.bg, borderWidth: 3, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center', zIndex: 5 },
+  centerGrad: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  costHint: { textAlign: 'center', color: Colors.textSec, fontSize: 13, marginBottom: 8 },
+  spinWrap: { marginHorizontal: 16, marginBottom: 10, borderRadius: 22, overflow: 'hidden' },
   spinBtn: { paddingVertical: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  spinBtnText: { fontSize: 20, fontWeight: '900', color: Colors.white, letterSpacing: 2 },
+  spinTxt: { fontSize: 20, fontWeight: '900', color: Colors.white, letterSpacing: 2 },
   historyRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 8, marginBottom: 10, justifyContent: 'center' },
   historyPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  historyText: { fontSize: 12, fontWeight: '800', color: Colors.white },
-  statsRow: {
-    flexDirection: 'row', marginHorizontal: 16, marginBottom: 16,
-    backgroundColor: Colors.surface, borderRadius: 18, borderWidth: 1, borderColor: Colors.border,
-  },
-  statCard: { flex: 1, alignItems: 'center', paddingVertical: 12 },
-  statCardBorder: { borderRightWidth: 1, borderRightColor: Colors.border },
-  statValue: { fontSize: 17, fontWeight: '800' },
-  statLabel: { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
+  historyTxt: { fontSize: 12, fontWeight: '800', color: Colors.white },
+  statsRow: { flexDirection: 'row', marginHorizontal: 16, marginBottom: 16, backgroundColor: Colors.surface, borderRadius: 18, borderWidth: 1, borderColor: Colors.border },
+  stat: { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  statV: { fontSize: 17, fontWeight: '800' },
+  statL: { fontSize: 11, color: Colors.textMuted, marginTop: 3 },
 });

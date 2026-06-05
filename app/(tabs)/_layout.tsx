@@ -1,15 +1,24 @@
 import { Tabs } from 'expo-router';
-import { Platform, View, StyleSheet } from 'react-native';
+import { Platform, View, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 
-function TabIcon({ name, focused, color }: { name: any; focused: boolean; color: string }) {
-  if (!focused) return <Ionicons name={name} size={22} color={color} />;
+function TabIcon({ name, focused, label, color }: { name: any; focused: boolean; label: string; color: string }) {
+  if (!focused) {
+    return (
+      <View style={styles.iconWrap}>
+        <Ionicons name={name} size={20} color={Colors.textMuted} />
+      </View>
+    );
+  }
   return (
-    <LinearGradient colors={Colors.gradientPrimary} style={styles.activeTab}>
-      <Ionicons name={name} size={20} color={Colors.white} />
-    </LinearGradient>
+    <View style={styles.iconWrap}>
+      <LinearGradient colors={Colors.gradPurple} style={styles.activeIcon}>
+        <Ionicons name={name} size={18} color={Colors.white} />
+      </LinearGradient>
+      <View style={styles.activeDot} />
+    </View>
   );
 }
 
@@ -22,38 +31,45 @@ export default function TabsLayout() {
           backgroundColor: Colors.surface,
           borderTopColor: Colors.border,
           borderTopWidth: 1,
-          height: Platform.OS === 'web' ? 84 : 64,
-          paddingBottom: Platform.OS === 'web' ? 34 : 10,
-          paddingTop: 10,
+          height: Platform.OS === 'web' ? 88 : 72,
+          paddingBottom: Platform.OS === 'web' ? 28 : 14,
+          paddingTop: 8,
+          ...(Platform.OS === 'web' ? {
+            boxShadow: '0 -4px 30px rgba(139,92,246,0.15)',
+          } as any : {}),
         },
-        tabBarActiveTintColor: Colors.primaryLight,
+        tabBarActiveTintColor: Colors.neonPurple,
         tabBarInactiveTintColor: Colors.textMuted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: 4 },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', marginTop: 2, letterSpacing: 0.3 },
+        tabBarShowLabel: true,
       }}
     >
       <Tabs.Screen name="index" options={{
         title: 'Home',
-        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} color={color} />,
+        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'home' : 'home-outline'} focused={focused} label="Home" color={color} />,
       }} />
       <Tabs.Screen name="games" options={{
         title: 'Games',
-        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'game-controller' : 'game-controller-outline'} focused={focused} color={color} />,
+        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'game-controller' : 'game-controller-outline'} focused={focused} label="Games" color={color} />,
+      }} />
+      <Tabs.Screen name="leaderboard" options={{
+        title: 'Ranks',
+        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'podium' : 'podium-outline'} focused={focused} label="Ranks" color={color} />,
       }} />
       <Tabs.Screen name="wallet" options={{
         title: 'Wallet',
-        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'wallet' : 'wallet-outline'} focused={focused} color={color} />,
+        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'wallet' : 'wallet-outline'} focused={focused} label="Wallet" color={color} />,
       }} />
       <Tabs.Screen name="profile" options={{
         title: 'Profile',
-        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} color={color} />,
+        tabBarIcon: ({ focused, color }) => <TabIcon name={focused ? 'person' : 'person-outline'} focused={focused} label="Profile" color={color} />,
       }} />
     </Tabs>
   );
 }
 
 const styles = StyleSheet.create({
-  activeTab: {
-    width: 40, height: 36, borderRadius: 12,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  iconWrap: { alignItems: 'center', gap: 3 },
+  activeIcon: { width: 38, height: 34, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  activeDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.neonPurple },
 });

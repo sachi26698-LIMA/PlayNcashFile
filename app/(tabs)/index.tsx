@@ -7,6 +7,7 @@ import { router } from 'expo-router';
 import Colors from '@/constants/colors';
 import FloatingParticles from '@/components/FloatingParticles';
 import NeonCard from '@/components/NeonCard';
+import SocialFeed from '@/components/SocialFeed';
 
 const { width } = Dimensions.get('window');
 
@@ -303,6 +304,16 @@ export default function HomeScreen() {
             );
           })}
         </View>
+
+        {/* Community Feed */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>💬 Community Feed</Text>
+          <View style={styles.liveIndicator}>
+            <View style={styles.livePulse} />
+            <Text style={styles.liveIndicatorTxt}>LIVE</Text>
+          </View>
+        </View>
+        <SocialFeed maxVisible={6} showCompose />
       </ScrollView>
     </View>
   );
@@ -366,4 +377,7 @@ const styles = StyleSheet.create({
   quickRow: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, marginBottom: 8 },
   quickCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderRadius: 18 },
   quickLabel: { flex: 1, fontSize: 14, fontWeight: '800', color: Colors.white },
+  liveIndicator: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: Colors.neonGreen + '22', borderWidth: 1, borderColor: Colors.neonGreen + '44', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  livePulse: { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.neonGreen },
+  liveIndicatorTxt: { fontSize: 10, fontWeight: '900', color: Colors.neonGreen, letterSpacing: 1 },
 });

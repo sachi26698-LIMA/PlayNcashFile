@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '@/constants/colors';
+import SocialFeed from '@/components/SocialFeed';
 
 const PERIODS = ['Today', 'Week', 'Month', 'All Time'];
 
@@ -157,6 +158,11 @@ export default function LeaderboardScreen() {
         {/* Player list */}
         <Text style={styles.sectionLbl}>📋 Full Rankings</Text>
         {REST.map((p, i) => <PlayerRow key={p.rank} player={p} delay={i * 80} />)}
+
+        {/* Community Feed */}
+        <Text style={styles.sectionLbl}>💬 Community Feed</Text>
+        <SocialFeed maxVisible={5} showCompose={false} />
+        <View style={{ height: 16 }} />
 
         {/* My rank card */}
         <View style={styles.myRankCard}>

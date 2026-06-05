@@ -8,6 +8,7 @@ import Colors from '@/constants/colors';
 import FloatingParticles from '@/components/FloatingParticles';
 import NeonCard from '@/components/NeonCard';
 import SocialFeed from '@/components/SocialFeed';
+import DailyChallenges from '@/components/DailyChallenges';
 
 const { width } = Dimensions.get('window');
 
@@ -283,9 +284,19 @@ export default function HomeScreen() {
           })}
         </View>
 
-        {/* Quick Actions */}
+        {/* Daily Challenges */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>⚡ Quick Actions</Text>
+          <Text style={styles.sectionTitle}>⚡ Daily Missions</Text>
+          <View style={[styles.liveIndicator, { backgroundColor: Colors.neonGold + '22', borderColor: Colors.neonGold + '44' }]}>
+            <View style={[styles.livePulse, { backgroundColor: Colors.neonGold }]} />
+            <Text style={[styles.liveIndicatorTxt, { color: Colors.neonGold }]}>TODAY</Text>
+          </View>
+        </View>
+        <DailyChallenges />
+
+        {/* Quick Actions */}
+        <View style={[styles.sectionRow, { marginTop: 8 }]}>
+          <Text style={styles.sectionTitle}>🎮 Quick Actions</Text>
         </View>
         <View style={styles.quickRow}>
           {[
